@@ -1,0 +1,60 @@
+{
+  "name": "@gnosis.pm/safe-tasks",
+  "version": "1.3.0",
+  "description": "Hardhat tasks for the Gnosis Safe",
+  "homepage": "https://github.com/gnosis/safe-tasks/",
+  "license": "GPL-3.0",
+  "files": [
+    "contracts",
+    "test",
+    "build",
+    "networks.json"
+  ],
+  "scripts": {
+    "lint": "eslint --max-warnings 0 .",
+    "prepare": "husky install"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gnosis/safe-tasks.git"
+  },
+  "keywords": [
+    "Ethereum",
+    "CLI",
+    "Safe"
+  ],
+  "author": "stefan@gnosis.pm",
+  "bugs": {
+    "url": "https://github.com/gnosis/safe-tasks/issues"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^4.7.0",
+    "@typescript-eslint/parser": "^4.7.0",
+    "eslint": "^7.13.0",
+    "eslint-config-prettier": "^6.15.0",
+    "eslint-plugin-import": "^2.22.1",
+    "eslint-plugin-no-only-tests": "^2.4.0",
+    "eslint-plugin-prettier": "^3.1.4",
+    "husky": "^5.1.3",
+    "rimraf": "^3.0.2",
+    "ts-node": "^9.1.1",
+    "typescript": "^4.1.3"
+  },
+  "dependencies": {
+    "@gnosis.pm/safe-contracts": "https://github.com/gnosis/safe-contracts#9964f2b18257ccbf3cd9233827ac97b5605f4b1f",
+    "@nomiclabs/hardhat-ethers": "^2.0.0",
+    "@types/mocha": "^8.2.0",
+    "@types/yargs": "^15.0.10",
+    "argv": "^0.0.2",
+    "dotenv": "^8.0.0",
+    "ethers": "^5.1.0",
+    "hardhat": "^2.1.2",
+    "hardhat-deploy": "^0.7.4",
+    "solc": "0.7.6",
+    "yargs": "^16.1.1"
+  },
+  "resolutions": {
+    "bitcore-lib": "8.1.1",
+    "ethers": "^5.1.0"
+  }
+}
