@@ -7,6 +7,8 @@ contracts/
 env/
 .env
 bin/
+dist/
+deployments/
 solc
 coverage/
 coverage.json
