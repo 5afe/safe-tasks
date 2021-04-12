@@ -12,7 +12,10 @@
   ],
   "scripts": {
     "lint": "eslint --max-warnings 0 .",
-    "prepare": "husky install"
+    "build": "hardhat compile",
+    "deploy": "hardhat deploy --network",
+    "vendor": "yarn rimraf $INIT_CWD/contracts && mkdir $INIT_CWD/contracts && cp -r node_modules/@gnosis.pm/safe-contracts/contracts $INIT_CWD && yarn rimraf $INIT_CWD/contracts/test",
+    "prepare": "husky install && yarn vendor && yarn build"
   },
   "repository": {
     "type": "git",
