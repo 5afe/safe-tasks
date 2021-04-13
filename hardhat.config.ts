@@ -14,7 +14,7 @@ const argv = yargs
 
 // Load environment variables.
 dotenv.config();
-const { INFURA_KEY, MNEMONIC, ETHERSCAN_API_KEY, PK, SOLIDITY_VERSION, SOLIDITY_SETTINGS } = process.env;
+const { NODE_URL, INFURA_KEY, MNEMONIC, ETHERSCAN_API_KEY, PK, SOLIDITY_VERSION, SOLIDITY_SETTINGS } = process.env;
 
 const DEFAULT_MNEMONIC =
   "candy maple cake sugar pudding cream honey rich smooth crumble sweet treat";
@@ -86,6 +86,10 @@ export default {
     volta: {
       ...sharedNetworkConfig,
       url: `https://volta-rpc.energyweb.org`,
+    },
+    custom: {
+      ...sharedNetworkConfig,
+      url: NODE_URL,
     },
   },
   namedAccounts: {
