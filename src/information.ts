@@ -10,6 +10,11 @@ export const getSingletonAddress = async (hre: HRE, address: string): Promise<st
     return getAddress("0x" + result.slice(26))
 }
 
+export const getFallbackHandlerAddress = async (hre: HRE, address: string): Promise<string> => {
+    const result = await hre.ethers.provider.getStorageAt(address, "0x6c9a6c4a39284e37ed1cf53d337577d14212a4870fb976a4366c693b939918d5")
+    return getAddress("0x" + result.slice(26))
+}
+
 const getModules = async (hre: HRE, safe: Contract): Promise<string[]> => {
     try {
         return (await safe.getModulesPaginated(AddressOne, 10))[0]
@@ -34,5 +39,6 @@ task("safe-info", "Returns information about a Safe")
         console.log(`Owners: ${await safe.getOwners()}`)
         console.log(`Threshold: ${await safe.getThreshold()}`)
         console.log(`Nonce: ${await safe.nonce()}`)
+        console.log(`Fallback Handler: ${await getFallbackHandlerAddress(hre, safeAddress)}`)
         console.log(`Modules: ${await getModules(hre, safe)}`)
     });

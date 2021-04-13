@@ -14,6 +14,8 @@
     "lint": "eslint --max-warnings 0 .",
     "build": "hardhat compile",
     "deploy": "hardhat deploy --network",
+    "set-network": "echo $HARDHAT_NETWORK",
+    "cli": "hardhat --network $CLI_NETWORK",
     "vendor": "yarn rimraf $INIT_CWD/contracts && mkdir $INIT_CWD/contracts && cp -r node_modules/@gnosis.pm/safe-contracts/contracts $INIT_CWD && yarn rimraf $INIT_CWD/contracts/test",
     "prepare": "husky install && yarn vendor && yarn build"
   },
@@ -44,7 +46,7 @@
     "typescript": "^4.1.3"
   },
   "dependencies": {
-    "@gnosis.pm/safe-contracts": "https://github.com/gnosis/safe-contracts#9964f2b18257ccbf3cd9233827ac97b5605f4b1f",
+    "@gnosis.pm/safe-contracts": "https://github.com/gnosis/safe-contracts#461fde449a8108eff0ec26a81001120475790c6d",
     "@nomiclabs/hardhat-ethers": "^2.0.0",
     "@types/mocha": "^8.2.0",
     "@types/yargs": "^15.0.10",

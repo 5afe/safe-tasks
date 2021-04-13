@@ -1,7 +1,5 @@
 import { ethers } from 'ethers'
-import { EventTx, ModuleTx, MultisigTx, MultisigUnknownTx, TransferDetails, TransferTx } from './types'
-
-const provider = ethers.providers.getDefaultProvider(process.env.REACT_APP_ETHEREUM_NODE_URL)
+import { EtherDetails, EventTx, ModuleTx, MultisigTx, MultisigUnknownTx, TransferDetails, TransferTx } from './types'
 
 const erc20InterfaceDefinition = [
     "event Transfer(address indexed from, address indexed to, uint256 amount)"
@@ -23,21 +21,23 @@ const safeInterfaceDefinition = [
     "event ExecutionSuccess(bytes32 txHash, uint256 payment)",
     "event ExecutionFailure(bytes32 txHash, uint256 payment)",
     "event ExecutionFromModuleSuccess(address indexed module)",
-    "event ExecutionFromModuleFailure(address indexed module)"
+    "event ExecutionFromModuleFailure(address indexed module)",
+    "event SafeReceived(address indexed sender, uint256 value)"
 ]
 const safeInterface = new ethers.utils.Interface(safeInterfaceDefinition)
 const successTopic = safeInterface.getEventTopic("ExecutionSuccess")
 const failureTopic = safeInterface.getEventTopic("ExecutionFailure")
 const moduleSuccessTopic = safeInterface.getEventTopic("ExecutionFromModuleSuccess")
 const moduleFailureTopic = safeInterface.getEventTopic("ExecutionFromModuleFailure")
+const etherReceivedTopic = safeInterface.getEventTopic("SafeReceived")
 // Failure topics cannot generate sub events, we should remove them in the future
 const parentTopics = [successTopic, moduleSuccessTopic, failureTopic, moduleFailureTopic]
 
-const loadBlock = async (blockHash: string): Promise<ethers.providers.Block> => {
+const loadBlock = async (provider: ethers.providers.Provider, blockHash: string): Promise<ethers.providers.Block> => {
     return await provider.getBlock(blockHash)
 }
 
-const loadEthTx = async (txHash: string): Promise<ethers.providers.TransactionResponse> => {
+const loadEthTx = async (provider: ethers.providers.Provider, txHash: string): Promise<ethers.providers.TransactionResponse> => {
     return await provider.getTransaction(txHash)
 }
 
@@ -77,10 +77,10 @@ const decodeTx = (account: string, tx: ethers.providers.TransactionResponse): De
     }
 }
 
-const mutlisigTxEntry = async (account: string, log: ethers.providers.Log, safeTxHash: string, success: boolean, subLogs: ethers.providers.Log[]): Promise<MultisigTx | MultisigUnknownTx> => {
-    const ethTx = await loadEthTx(log.transactionHash)
+const mutlisigTxEntry = async (provider: ethers.providers.Provider, account: string, log: ethers.providers.Log, safeTxHash: string, success: boolean, subLogs: ethers.providers.Log[]): Promise<MultisigTx | MultisigUnknownTx> => {
+    const ethTx = await loadEthTx(provider, log.transactionHash)
     const decodedTx = decodeTx(account, ethTx)
-    const block = await loadBlock(log.blockHash)
+    const block = await loadBlock(provider, log.blockHash)
     if (!decodedTx) return {
         type: "MultisigUnknown",
         id: "multisig_" + safeTxHash,
@@ -103,8 +103,8 @@ const mutlisigTxEntry = async (account: string, log: ethers.providers.Log, safeT
     }
 }
 
-const moduleTxEntry = async (log: ethers.providers.Log, moduleAddress: string, success: boolean, subLogs: ethers.providers.Log[]): Promise<ModuleTx> => {
-    const block = await loadBlock(log.blockHash)
+const moduleTxEntry = async (provider: ethers.providers.Provider, log: ethers.providers.Log, moduleAddress: string, success: boolean, subLogs: ethers.providers.Log[]): Promise<ModuleTx> => {
+    const block = await loadBlock(provider, log.blockHash)
     return {
         type: "Module",
         txHash: log.transactionHash,
@@ -116,8 +116,8 @@ const moduleTxEntry = async (log: ethers.providers.Log, moduleAddress: string, s
     }
 }
 
-const transferEntry = async (account: string, log: ethers.providers.Log): Promise<TransferTx | undefined> => {
-    const block = await loadBlock(log.blockHash)
+const transferEntry = async (provider: ethers.providers.Provider, account: string, log: ethers.providers.Log): Promise<TransferTx | undefined> => {
+    const block = await loadBlock(provider, log.blockHash)
     let type: string = ""
     let eventInterface
     if (log.topics.length === 4) {
@@ -158,27 +158,49 @@ const transferEntry = async (account: string, log: ethers.providers.Log): Promis
     }
 }
 
-const mapLog = async (account: string, log: ethers.providers.Log, subLogs: ethers.providers.Log[]): Promise<EventTx | undefined> => {
+const incomingEthEntry = async (provider: ethers.providers.Provider, account: string, log: ethers.providers.Log): Promise<TransferTx> => {
+    const block = await loadBlock(provider, log.blockHash)
+    const event = safeInterface.decodeEventLog("SafeReceived", log.data, log.topics)
+    let details: EtherDetails = {
+        type: "ETHER",
+        value: event.value.toString()
+    } 
+    return {
+        type: "Transfer",
+        id: `transfer_${log.blockNumber}_${log.transactionIndex}_${log.logIndex}`,
+        timestamp: block.timestamp,
+        sender: event.sender,
+        receipient: account,
+        direction: "INCOMING",
+        details
+    }
+}
+
+const mapLog = async (provider: ethers.providers.Provider, account: string, log: ethers.providers.Log, subLogs: ethers.providers.Log[]): Promise<EventTx | undefined> => {
     switch (log.topics[0]) {
         case successTopic: {
             const event = safeInterface.decodeEventLog("ExecutionSuccess", log.data, log.topics)
-            return await mutlisigTxEntry(account, log, event.txHash, true, subLogs)
+            return await mutlisigTxEntry(provider, account, log, event.txHash, true, subLogs)
         }
         case failureTopic: {
             const event = safeInterface.decodeEventLog("ExecutionFailure", log.data, log.topics)
-            return await mutlisigTxEntry(account, log, event.txHash, false, subLogs)
+            return await mutlisigTxEntry(provider, account, log, event.txHash, false, subLogs)
         }
         case moduleSuccessTopic: {
             const event = safeInterface.decodeEventLog("ExecutionFromModuleSuccess", log.data, log.topics)
-            return await moduleTxEntry(log, event.module, true, subLogs)
+            return await moduleTxEntry(provider, log, event.module, true, subLogs)
         }
         case moduleFailureTopic: {
             const event = safeInterface.decodeEventLog("ExecutionFromModuleFailure", log.data, log.topics)
-            return await moduleTxEntry(log, event.module, false, subLogs)
+            return await moduleTxEntry(provider, log, event.module, false, subLogs)
         }
         case transferTopic: {
             if (subLogs.length > 0) console.error("Sub logs for transfer entry!", log, subLogs)
-            return await transferEntry(account, log)
+            return await transferEntry(provider, account, log)
+        }
+        case etherReceivedTopic: {
+            if (subLogs.length > 0) console.error("Sub logs for transfer entry!", log, subLogs)
+            return await incomingEthEntry(provider, account, log)
         }
         default:
             console.error("Received unknown event", log)
@@ -186,7 +208,7 @@ const mapLog = async (account: string, log: ethers.providers.Log, subLogs: ether
     }
 }
 
-const loadOutgoingTransfer = (account: string): Promise<ethers.providers.Log[]> => {
+const loadOutgoingTransfer = (provider: ethers.providers.Provider, account: string): Promise<ethers.providers.Log[]> => {
     const filter = {
         topics: [[transferTopic], [ethers.utils.defaultAbiCoder.encode(["address"], [account])]],
         fromBlock: "earliest"
@@ -197,7 +219,7 @@ const loadOutgoingTransfer = (account: string): Promise<ethers.providers.Log[]> 
     })
 }
 
-const loadIncomingTransfer = (account: string): Promise<ethers.providers.Log[]> => {
+const loadIncomingTransfer = (provider: ethers.providers.Provider, account: string): Promise<ethers.providers.Log[]> => {
     const filter = {
         topics: [[transferTopic], null as any, [ethers.utils.defaultAbiCoder.encode(["address"], [account])]],
         fromBlock: "earliest"
@@ -208,7 +230,19 @@ const loadIncomingTransfer = (account: string): Promise<ethers.providers.Log[]> 
     })
 }
 
-const loadSafeTransactionTransfer = (account: string): Promise<ethers.providers.Log[]> => {
+const loadIncomingEther = (provider: ethers.providers.Provider, account: string): Promise<ethers.providers.Log[]> => {
+    const filter = {
+        topics: [[etherReceivedTopic]],
+        address: account,
+        fromBlock: "earliest"
+    }
+    return provider.getLogs(filter).then((e) => {
+        console.log("ETH", e.length)
+        return e
+    })
+}
+
+const loadSafeTransactionTransfer = (provider: ethers.providers.Provider, account: string): Promise<ethers.providers.Log[]> => {
     const filter = {
         topics: [[successTopic, failureTopic, moduleSuccessTopic, moduleFailureTopic]],
         address: account,
@@ -303,9 +337,14 @@ const groupLogs = (logs: ethers.providers.Log[]): GroupedLogs[] => {
     return out
 }
 
-export const loadHistoryTxs = async (account: string, start: number): Promise<EventTx[]> => {
-    const txLogs = await mergeLogs(loadSafeTransactionTransfer(account), loadOutgoingTransfer(account), loadIncomingTransfer(account))
+export const loadHistoryTxs = async (provider: ethers.providers.Provider, account: string, start: number): Promise<EventTx[]> => {
+    const txLogs = await mergeLogs(
+        loadSafeTransactionTransfer(provider, account), 
+        loadOutgoingTransfer(provider, account), 
+        loadIncomingTransfer(provider, account), 
+        loadIncomingEther(provider, account)
+    )
     const groups = groupLogs(txLogs.reverse())
-    const inter = groups.slice(start, start + 5).map(({ parent, children }) => mapLog(account, parent, children))
+    const inter = groups.slice(start, start + 5).map(({ parent, children }) => mapLog(provider, account, parent, children))
     return (await Promise.all(inter)).filter((e) => e !== undefined) as EventTx[]
 }

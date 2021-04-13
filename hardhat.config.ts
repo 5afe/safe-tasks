@@ -1,7 +1,7 @@
 import "@nomiclabs/hardhat-ethers";
 import "hardhat-deploy";
 import dotenv from "dotenv";
-import type { HttpNetworkUserConfig } from "hardhat/types";
+import type { HardhatUserConfig, HttpNetworkUserConfig } from "hardhat/types";
 import yargs from "yargs";
 
 const argv = yargs
@@ -14,7 +14,7 @@ const argv = yargs
 
 // Load environment variables.
 dotenv.config();
-const { NODE_URL, INFURA_KEY, MNEMONIC, ETHERSCAN_API_KEY, PK, SOLIDITY_VERSION, SOLIDITY_SETTINGS } = process.env;
+const { NETWORK, NODE_URL, INFURA_KEY, MNEMONIC, PK, SOLIDITY_VERSION, SOLIDITY_SETTINGS } = process.env;
 
 const DEFAULT_MNEMONIC =
   "candy maple cake sugar pudding cream honey rich smooth crumble sweet treat";
@@ -35,11 +35,12 @@ if (["mainnet", "rinkeby", "kovan", "goerli"].includes(argv.network) && INFURA_K
 }
 
 import "./src/tasks"
+import { network } from "hardhat";
 
 const primarySolidityVersion = SOLIDITY_VERSION || "0.7.6"
 const soliditySettings = !!SOLIDITY_SETTINGS ? JSON.parse(SOLIDITY_SETTINGS) : undefined
 
-export default {
+const userConfig: HardhatUserConfig = {
   paths: {
     artifacts: "build/artifacts",
     cache: "build/cache",
@@ -87,10 +88,6 @@ export default {
       ...sharedNetworkConfig,
       url: `https://volta-rpc.energyweb.org`,
     },
-    custom: {
-      ...sharedNetworkConfig,
-      url: NODE_URL,
-    },
   },
   namedAccounts: {
     deployer: 0,
@@ -98,7 +95,14 @@ export default {
   mocha: {
     timeout: 2000000,
   },
-  etherscan: {
-    apiKey: ETHERSCAN_API_KEY,
-  },
 };
+if (NETWORK) {
+  userConfig.defaultNetwork = NETWORK
+}
+if (NODE_URL) {
+  userConfig.networks!!.custom = {
+    ...sharedNetworkConfig,
+    url: NODE_URL,
+  }
+}
+export default userConfig

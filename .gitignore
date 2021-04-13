@@ -9,6 +9,7 @@ env/
 bin/
 dist/
 deployments/
+cli_cache
 solc
 coverage/
 coverage.json

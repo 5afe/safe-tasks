@@ -50,7 +50,7 @@ export interface TransferTx extends Base {
     details: TransferDetails
 }
 
-export type TransferDetails = Erc20Details | Erc721Details
+export type TransferDetails = Erc20Details | Erc721Details | EtherDetails
 
 export interface Erc20Details {
     type: "ERC20",
@@ -62,4 +62,9 @@ export interface Erc721Details {
     type: "ERC721",
     tokenAddress: string,
     tokenId: string
+}
+
+export interface EtherDetails {
+    type: "ETHER",
+    value: string
 }
