@@ -1,5 +1,5 @@
 import { task, types } from "hardhat/config";
-import { contractFactory, multiSendLib } from "../contracts";
+import { contractFactory, multiSendLib, safeSingleton } from "../contracts";
 import { buildMultiSendSafeTx, buildSafeTransaction, calculateSafeTransactionHash, SafeTransaction, MetaTransaction } from "@gnosis.pm/safe-contracts";
 import { parseEther } from "@ethersproject/units";
 import { getAddress, isHexString } from "ethers/lib/utils";
@@ -23,7 +23,7 @@ task("propose", "Create a Safe tx proposal json file")
     .addParam("data", "Data as hex string", "0x", types.string, true)
     .addFlag("delegatecall", "Indicator if tx should be executed as a delegatecall")
     .setAction(async (taskArgs, hre) => {
-        const safe = (await contractFactory(hre, "GnosisSafe")).attach(taskArgs.address)
+        const safe = await safeSingleton(hre, taskArgs.address)
         const safeAddress = await safe.resolvedAddress
         console.log(`Using Safe at ${safeAddress}`)
         const nonce = await safe.nonce()
@@ -74,12 +74,11 @@ const parseMultiSendJsonFile = async(hre: HardhatRuntimeEnvironment, file: strin
     return buildMultiSendSafeTx(multiSend, txsData.map(desc => buildMetaTx(desc)), nonce)
 }
 
-
 task("propose-multisend", "Create a Safe tx proposal json file")
     .addParam("address", "Address or ENS name of the Safe", undefined, types.string)
     .addParam("txs", "Json file with transactions", undefined, types.inputFile)
     .setAction(async (taskArgs, hre) => {
-        const safe = (await contractFactory(hre, "GnosisSafe")).attach(taskArgs.address)
+        const safe = await safeSingleton(hre, taskArgs.address)
         const safeAddress = await safe.resolvedAddress
         console.log(`Using Safe at ${safeAddress}`)
         const nonce = await safe.nonce()
@@ -101,7 +100,7 @@ task("show-proposal", "Shows details for a Safe transaction")
     .addParam("hash", "Hash of Safe transaction to display", undefined, types.string)
     .setAction(async (taskArgs, hre) => {
         const proposal: SafeTxProposal = await readFromCliCache(proposalFile(taskArgs.hash))
-        const safe = (await contractFactory(hre, "GnosisSafe")).attach(proposal.safe)
+        const safe = await safeSingleton(hre, taskArgs.address)
         const safeAddress = await safe.resolvedAddress
         console.log(`Using Safe at ${safeAddress}@${proposal.chainId}`)
         const nonce = await safe.nonce()

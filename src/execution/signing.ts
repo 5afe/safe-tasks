@@ -1,5 +1,5 @@
 import { task, types } from "hardhat/config";
-import { contractFactory } from "../contracts";
+import { contractFactory, safeSingleton } from "../contracts";
 import { buildSafeTransaction, SafeSignature, safeSignMessage } from "@gnosis.pm/safe-contracts";
 import { parseEther } from "@ethersproject/units";
 import { isHexString } from "ethers/lib/utils";
@@ -16,7 +16,7 @@ task("sign", "Signs a Safe transaction")
     .setAction(async (taskArgs, hre) => {
         const signers = await hre.ethers.getSigners()
         const signer = signers[taskArgs.signerIndex]
-        const safe = (await contractFactory(hre, "GnosisSafe")).attach(taskArgs.address)
+        const safe = await safeSingleton(hre, taskArgs.address)
         const safeAddress = await safe.resolvedAddress
         console.log(`Using Safe at ${safeAddress} with ${signer.address}`)
         const nonce = await safe.nonce()
@@ -39,7 +39,7 @@ task("sign-proposal", "Signs a Safe transaction")
         const proposal: SafeTxProposal = await readFromCliCache(proposalFile(taskArgs.hash))
         const signers = await hre.ethers.getSigners()
         const signer = signers[taskArgs.signerIndex]
-        const safe = (await contractFactory(hre, "GnosisSafe")).attach(proposal.safe)
+        const safe = await safeSingleton(hre, proposal.safe)
         const safeAddress = await safe.resolvedAddress
         console.log(`Using Safe at ${safeAddress} with ${signer.address}`)
         const owners: string[] = await safe.getOwners()

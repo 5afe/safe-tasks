@@ -3,7 +3,7 @@ import { HardhatRuntimeEnvironment as HRE } from "hardhat/types";
 import { getAddress } from "@ethersproject/address";
 import { AddressOne } from "@gnosis.pm/safe-contracts";
 import { Contract } from "@ethersproject/contracts";
-import { contractFactory } from "./contracts";
+import { compatHandler, contractFactory, safeSingleton } from "./contracts";
 
 export const getSingletonAddress = async (hre: HRE, address: string): Promise<string> => {
     const result = await hre.ethers.provider.getStorageAt(address, 0)
@@ -21,8 +21,8 @@ const getModules = async (hre: HRE, safe: Contract): Promise<string[]> => {
     } catch (e) {
     }
     try {
-        const compat = await contractFactory(hre, "CompatibilityFallbackHandler")
-        return await compat.attach(safe.address).getModules()
+        const compat = await compatHandler(hre, safe.address)
+        return await compat.getModules()
     } catch (e) {
     }
     return ["Could not load modules"]
@@ -31,7 +31,7 @@ const getModules = async (hre: HRE, safe: Contract): Promise<string[]> => {
 task("safe-info", "Returns information about a Safe")
     .addParam("address", "Address or ENS name of the Safe to check", undefined, types.string)
     .setAction(async (taskArgs, hre) => {
-        const safe = (await contractFactory(hre, "GnosisSafe")).attach(taskArgs.address)
+        const safe = await safeSingleton(hre, taskArgs.address)
         const safeAddress = await safe.resolvedAddress
         console.log(`Checking Safe at ${safeAddress}`)
         console.log(`Singleton: ${await getSingletonAddress(hre, safeAddress)}`)

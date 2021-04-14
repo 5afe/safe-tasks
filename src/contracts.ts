@@ -1,12 +1,27 @@
+import { Contract } from "@ethersproject/contracts";
+import { getCompatibilityFallbackHandlerDeployment, getMultiSendDeployment, getProxyFactoryDeployment, getSafeSingletonDeployment, SingletonDeployment } from "@gnosis.pm/safe-deployments";
 import { HardhatRuntimeEnvironment as HRE } from "hardhat/types";
 
 export const contractFactory = (hre: HRE, contractName: string) => hre.ethers.getContractFactory(contractName);
 
-export const contractInstance = async (hre: HRE, contractName: string, address?: string) => {
-    const deploymentAddress = address || (await hre.deployments.get(contractName)).address
-    const contract = await contractFactory(hre, contractName)
-    return contract.attach(deploymentAddress)
+export const contractInstance = async (hre: HRE, deployment: SingletonDeployment | undefined, address?: string): Promise<Contract> => {
+    if (!deployment) throw Error("No deployment provided")
+    // TODO: use network
+    const contractAddress = address || deployment.defaultAddress
+    return await hre.ethers.getContractAt(deployment.abi, contractAddress)
 }
-export const safeSingleton = async (hre: HRE, l2: boolean, address?: string) => contractInstance(hre, l2 ? "GnosisSafeL2" : "GnosisSafe", address)
-export const proxyFactory = async (hre: HRE, address?: string) => contractInstance(hre, "GnosisSafeProxyFactory", address)
-export const multiSendLib = async (hre: HRE, address?: string) => contractInstance(hre, "MultiSend", address)
+
+export const safeSingleton = async (hre: HRE, address?: string) => 
+    contractInstance(hre, getSafeSingletonDeployment(), address)
+
+export const safeL2Singleton = async (hre: HRE, address?: string) => 
+    contractInstance(hre, getSafeSingletonDeployment(), address)
+
+export const proxyFactory = async (hre: HRE, address?: string) => 
+    contractInstance(hre, getProxyFactoryDeployment(), address)
+
+export const multiSendLib = async (hre: HRE, address?: string) => 
+    contractInstance(hre, getMultiSendDeployment(), address)
+    
+export const compatHandler = async (hre: HRE, address?: string) => 
+    contractInstance(hre, getCompatibilityFallbackHandlerDeployment(), address)

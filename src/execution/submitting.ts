@@ -1,6 +1,6 @@
 import { BigNumber, Contract, PopulatedTransaction, Signer, utils } from "ethers";
 import { task, types } from "hardhat/config";
-import { contractFactory } from "../contracts";
+import { contractFactory, safeSingleton } from "../contracts";
 import { getSingletonAddress } from "../information";
 import { buildSafeTransaction, calculateSafeTransactionHash, populateExecuteTx, safeApproveHash, SafeSignature, SafeTransaction } from "@gnosis.pm/safe-contracts";
 import { parseEther } from "@ethersproject/units";
@@ -81,7 +81,7 @@ task("submit", "Executes a Safe transaction")
     .addFlag("useAccessList", "Indicator if tx should use EIP-2929")
     .setAction(async (taskArgs, hre) => {
         const [signer] = await hre.ethers.getSigners()
-        const safe = (await contractFactory(hre, "GnosisSafe")).attach(taskArgs.address)
+        const safe = await safeSingleton(hre, taskArgs.address)
         const safeAddress = await safe.resolvedAddress
         console.log(`Using Safe at ${safeAddress} with ${signer.address}`)
         const nonce = await safe.nonce()
@@ -108,7 +108,7 @@ task("submit-proposal", "Executes a Safe transaction")
         const proposal: SafeTxProposal = await readFromCliCache(proposalFile(taskArgs.hash))
         const signers = await hre.ethers.getSigners()
         const signer = signers[taskArgs.signerIndex]
-        const safe = (await contractFactory(hre, "GnosisSafe")).attach(proposal.safe)
+        const safe = await safeSingleton(hre, proposal.safe)
         const safeAddress = await safe.resolvedAddress
         console.log(`Using Safe at ${safeAddress} with ${signer.address}`)
         const currentNonce = await safe.nonce()
