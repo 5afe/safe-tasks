@@ -18,7 +18,7 @@ Create `.env` file to use the commands (see `.env.sample` for more info):
 - `NETWORK` - Network that should be used (e.g. `rinkeby`, `mainnet` or `custom`)
 - `PK` or `MNEMONIC`- Credentials for the account that should be used
 - `INFURA`- For network that use Infura based RPC
-- `NODE`- RPC node for `custom` network
+- `NODE`- RPC node for `custom` network (optional)
 
 ### Help
 
