@@ -12,7 +12,7 @@
   ],
   "scripts": {
     "lint": "eslint --max-warnings 0 .",
-    "cli": "hardhat",
+    "safe": "hardhat",
     "prepare": "husky install"
   },
   "repository": {

@@ -35,7 +35,6 @@ if (["mainnet", "rinkeby", "kovan", "goerli"].includes(argv.network) && INFURA_K
 }
 
 import "./src/tasks"
-import { network } from "hardhat";
 
 const primarySolidityVersion = SOLIDITY_VERSION || "0.7.6"
 const soliditySettings = !!SOLIDITY_SETTINGS ? JSON.parse(SOLIDITY_SETTINGS) : undefined

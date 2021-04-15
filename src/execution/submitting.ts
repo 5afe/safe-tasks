@@ -1,6 +1,6 @@
 import { BigNumber, Contract, PopulatedTransaction, Signer, utils } from "ethers";
 import { task, types } from "hardhat/config";
-import { contractFactory, safeSingleton } from "../contracts";
+import { safeSingleton } from "../contracts";
 import { getSingletonAddress } from "../information";
 import { buildSafeTransaction, calculateSafeTransactionHash, populateExecuteTx, safeApproveHash, SafeSignature, SafeTransaction } from "@gnosis.pm/safe-contracts";
 import { parseEther } from "@ethersproject/units";
@@ -52,7 +52,7 @@ const isOwnerSignature = (owners: string[], signature: SafeSignature): SafeSigna
     return signature
 }
 
-const prepareSignatures = async (safe: Contract, tx: SafeTransaction, signaturesCSV: string | undefined, submitter?: Signer): Promise<SafeSignature[]> => {
+const prepareSignatures = async (safe: Contract, tx: SafeTransaction, signaturesCSV: string | undefined, submitter?: Signer, knownSafeTxHash?: string): Promise<SafeSignature[]> => {
     const signatures: SafeSignature[] = []
     const owners = await safe.getOwners()
     if (submitter && owners.indexOf(await submitter.getAddress()) >= 0) {
@@ -60,7 +60,7 @@ const prepareSignatures = async (safe: Contract, tx: SafeTransaction, signatures
     }
     if (signaturesCSV) {
         const chainId = (await safe.provider.getNetwork()).chainId
-        const safeTxHash = calculateSafeTransactionHash(safe, tx, chainId)
+        const safeTxHash = knownSafeTxHash ?? calculateSafeTransactionHash(safe, tx, chainId)
         const parsedSigs = signaturesCSV.split(",")
             .map(signature => isOwnerSignature(owners, parseSignature(safeTxHash, signature)))
             .filter(signature => signature.signer !== signatures[0]?.signer)
@@ -71,8 +71,8 @@ const prepareSignatures = async (safe: Contract, tx: SafeTransaction, signatures
     return signatures.slice(0, threshold)
 }
 
-task("submit", "Executes a Safe transaction")
-    .addParam("address", "Address or ENS name of the Safe to check", undefined, types.string)
+task("submit-tx", "Executes a Safe transaction")
+    .addPositionalParam("address", "Address or ENS name of the Safe to check", undefined, types.string)
     .addParam("to", "Address of the target", undefined, types.string)
     .addParam("value", "Value in ETH", "0", types.string, true)
     .addParam("data", "Data as hex string", "0x", types.string, true)
@@ -80,6 +80,7 @@ task("submit", "Executes a Safe transaction")
     .addFlag("delegatecall", "Indicator if tx should be executed as a delegatecall")
     .addFlag("useAccessList", "Indicator if tx should use EIP-2929")
     .setAction(async (taskArgs, hre) => {
+        console.log(`Running on ${hre.network.name}`)
         const [signer] = await hre.ethers.getSigners()
         const safe = await safeSingleton(hre, taskArgs.address)
         const safeAddress = await safe.resolvedAddress
@@ -95,16 +96,17 @@ task("submit", "Executes a Safe transaction")
                 { address: await getSingletonAddress(hre, safe.address), storageKeys: [] }, // Singleton address
             ]
         }
-        console.log({ populatedTx })
-        console.log(await signer.sendTransaction(populatedTx).then(tx => tx.wait()))
+        const receipt = await signer.sendTransaction(populatedTx).then(tx => tx.wait())
+        console.log(receipt.transactionHash)
     });
 
 
 task("submit-proposal", "Executes a Safe transaction")
-    .addParam("hash", "Hash of Safe transaction to display", undefined, types.string)
+    .addPositionalParam("hash", "Hash of Safe transaction to display", undefined, types.string)
     .addParam("signerIndex", "Index of the signer to use", 0, types.int, true)
     .addFlag("useAccessList", "Indicator if tx should use EIP-2929")
     .setAction(async (taskArgs, hre) => {
+        console.log(`Running on ${hre.network.name}`)
         const proposal: SafeTxProposal = await readFromCliCache(proposalFile(taskArgs.hash))
         const signers = await hre.ethers.getSigners()
         const signer = signers[taskArgs.signerIndex]
@@ -116,8 +118,7 @@ task("submit-proposal", "Executes a Safe transaction")
             throw Error("Proposal does not have correct nonce!")
         }
         const signatureStrings: Record<string, string> = await loadSignatures(taskArgs.hash)
-        const signatures = await prepareSignatures(safe, proposal.tx, Object.values(signatureStrings).join(","), signer)
-        console.log({signatures})
+        const signatures = await prepareSignatures(safe, proposal.tx, Object.values(signatureStrings).join(","), signer, taskArgs.hash)
         const populatedTx: PopulatedTransaction = await populateExecuteTx(safe, proposal.tx, signatures)
         if (taskArgs.useAccessList) {
             populatedTx.type = 1
@@ -125,6 +126,6 @@ task("submit-proposal", "Executes a Safe transaction")
                 { address: await getSingletonAddress(hre, safe.address), storageKeys: [] }, // Singleton address
             ]
         }
-        console.log({ populatedTx })
-        console.log(await signer.sendTransaction(populatedTx).then(tx => tx.wait()))
+        const receipt = await signer.sendTransaction(populatedTx).then(tx => tx.wait())
+        console.log(receipt.transactionHash)
     });

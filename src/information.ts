@@ -28,8 +28,8 @@ const getModules = async (hre: HRE, safe: Contract): Promise<string[]> => {
     return ["Could not load modules"]
 }
 
-task("safe-info", "Returns information about a Safe")
-    .addParam("address", "Address or ENS name of the Safe to check", undefined, types.string)
+task("info", "Displays information about a Safe")
+    .addPositionalParam("address", "Address or ENS name of the Safe to check", undefined, types.string)
     .setAction(async (taskArgs, hre) => {
         const safe = await safeSingleton(hre, taskArgs.address)
         const safeAddress = await safe.resolvedAddress

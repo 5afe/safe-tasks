@@ -1,11 +1,11 @@
 import { task, types } from "hardhat/config";
-import { contractFactory, multiSendLib, safeSingleton } from "../contracts";
+import { multiSendLib, safeSingleton } from "../contracts";
 import { buildMultiSendSafeTx, buildSafeTransaction, calculateSafeTransactionHash, SafeTransaction, MetaTransaction } from "@gnosis.pm/safe-contracts";
 import { parseEther } from "@ethersproject/units";
 import { getAddress, isHexString } from "ethers/lib/utils";
 import { proposalFile, readFromCliCache, writeToCliCache } from "./utils";
 import { BigNumber } from "@ethersproject/bignumber";
-import { ethers } from "ethers";
+import { Contract, ethers } from "ethers";
 import fs from 'fs/promises'
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
@@ -16,13 +16,25 @@ export interface SafeTxProposal {
     tx: SafeTransaction
 }
 
+const calcSafeTxHash = async (safe: Contract, tx: SafeTransaction, chainId: number, onChainOnly: boolean): Promise<string> => {
+    const onChainHash = await safe.getTransactionHash(
+        tx.to, tx.value, tx.data, tx.operation, tx.safeTxGas, tx.baseGas, tx.gasPrice, tx.gasToken, tx.refundReceiver, tx.nonce
+    )
+    if (onChainOnly) return onChainHash
+    const offChainHash = calculateSafeTransactionHash(safe, tx, chainId)
+    if (onChainHash != offChainHash) throw Error("Unexpected hash! (For pre-1.3.0 version use --on-chain-hash)")
+    return offChainHash
+}
+
 task("propose", "Create a Safe tx proposal json file")
-    .addParam("address", "Address or ENS name of the Safe", undefined, types.string)
+    .addPositionalParam("address", "Address or ENS name of the Safe to check", undefined, types.string)
     .addParam("to", "Address of the target", undefined, types.string)
     .addParam("value", "Value in ETH", "0", types.string, true)
     .addParam("data", "Data as hex string", "0x", types.string, true)
     .addFlag("delegatecall", "Indicator if tx should be executed as a delegatecall")
+    .addFlag("onChainHash", "Get hash from chain (required for pre-1.3.0 version)")
     .setAction(async (taskArgs, hre) => {
+        console.log(`Running on ${hre.network.name}`)
         const safe = await safeSingleton(hre, taskArgs.address)
         const safeAddress = await safe.resolvedAddress
         console.log(`Using Safe at ${safeAddress}`)
@@ -30,7 +42,7 @@ task("propose", "Create a Safe tx proposal json file")
         if (!isHexString(taskArgs.data)) throw Error(`Invalid hex string provided for data: ${taskArgs.data}`)
         const tx = buildSafeTransaction({ to: taskArgs.to, value: parseEther(taskArgs.value).toString(), data: taskArgs.data, nonce: nonce.toString(), operation: taskArgs.delegatecall ? 1 : 0 })
         const chainId = (await safe.provider.getNetwork()).chainId
-        const safeTxHash = calculateSafeTransactionHash(safe, tx, chainId)
+        const safeTxHash = await calcSafeTxHash(safe, tx, chainId, taskArgs.onChainHash)
         const proposal: SafeTxProposal = {
             safe: safeAddress,
             chainId,
@@ -53,7 +65,7 @@ const buildData = (method: string, params?: any[]): string => {
     const iface = new ethers.utils.Interface([`function ${method}`])
     return iface.encodeFunctionData(method, params)
 }
- 
+
 const buildMetaTx = (description: TxDescription): MetaTransaction => {
     const to = getAddress(description.to)
     const value = parseEther(description.value).toString()
@@ -62,7 +74,7 @@ const buildMetaTx = (description: TxDescription): MetaTransaction => {
     return { to, value, data, operation }
 }
 
-const parseMultiSendJsonFile = async(hre: HardhatRuntimeEnvironment, file: string, nonce: number): Promise<SafeTransaction> => {
+const parseMultiSendJsonFile = async (hre: HardhatRuntimeEnvironment, file: string, nonce: number): Promise<SafeTransaction> => {
     const txsData: TxDescription[] = JSON.parse(await fs.readFile(file, 'utf8'))
     if (txsData.length == 0) {
         throw Error("No transacitons provided")
@@ -74,10 +86,12 @@ const parseMultiSendJsonFile = async(hre: HardhatRuntimeEnvironment, file: strin
     return buildMultiSendSafeTx(multiSend, txsData.map(desc => buildMetaTx(desc)), nonce)
 }
 
-task("propose-multisend", "Create a Safe tx proposal json file")
-    .addParam("address", "Address or ENS name of the Safe", undefined, types.string)
-    .addParam("txs", "Json file with transactions", undefined, types.inputFile)
+task("propose-multi", "Create a Safe tx proposal json file")
+    .addPositionalParam("address", "Address or ENS name of the Safe to check", undefined, types.string)
+    .addPositionalParam("txs", "Json file with transactions", undefined, types.inputFile)
+    .addFlag("onChainHash", "Get hash from chain (required for pre-1.3.0 version)")
     .setAction(async (taskArgs, hre) => {
+        console.log(`Running on ${hre.network.name}`)
         const safe = await safeSingleton(hre, taskArgs.address)
         const safeAddress = await safe.resolvedAddress
         console.log(`Using Safe at ${safeAddress}`)
@@ -85,7 +99,7 @@ task("propose-multisend", "Create a Safe tx proposal json file")
         const tx = await parseMultiSendJsonFile(hre, taskArgs.txs, nonce.toNumber())
         console.log("Safe transaction", tx)
         const chainId = (await safe.provider.getNetwork()).chainId
-        const safeTxHash = calculateSafeTransactionHash(safe, tx, chainId)
+        const safeTxHash = await calcSafeTxHash(safe, tx, chainId, taskArgs.onChainHash)
         const proposal: SafeTxProposal = {
             safe: safeAddress,
             chainId,
@@ -97,7 +111,7 @@ task("propose-multisend", "Create a Safe tx proposal json file")
     });
 
 task("show-proposal", "Shows details for a Safe transaction")
-    .addParam("hash", "Hash of Safe transaction to display", undefined, types.string)
+    .addPositionalParam("hash", "Hash of Safe transaction to display", undefined, types.string)
     .setAction(async (taskArgs, hre) => {
         const proposal: SafeTxProposal = await readFromCliCache(proposalFile(taskArgs.hash))
         const safe = await safeSingleton(hre, taskArgs.address)

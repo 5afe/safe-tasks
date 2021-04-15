@@ -1,16 +1,14 @@
 [
     {
-        "to": "0xDc2a92d357A054b02EE4a655102958019EEa0df6",
-        "value": "0",
-        "method": "addOwnerWithThreshold(address,uint256)",
-        "params": ["0x3783aF4041075579ad76171D612Eda7d531Ea687", "2"],
+        "to": "0xc778417E063141139Fce010982780140Aa0cD5Ab",
+        "value": "0.1",
         "operation": 0
     },
     {
-        "to": "0xDc2a92d357A054b02EE4a655102958019EEa0df6",
+        "to": "0xc778417E063141139Fce010982780140Aa0cD5Ab",
         "value": "0",
-        "method": "setFallbackHandler(address)",
-        "params": ["0xe7E0211Db5b3721FB7a39e96eF00C757C7798148"],
+        "method": "approve(address,uint256)",
+        "params": ["0xd0Dab4E640D95E9E8A47545598c33e31bDb53C7c", "1000000000000"],
         "operation": 0
     }
 ]

@@ -8,14 +8,14 @@ const parseSigners = (rawSigners: string): string[] => {
     return rawSigners.split(",").map(address => getAddress(address))
 }
 
-task("create-safe", "Deploys and verifies Safe contracts")
+task("create", "Create a Safe")
     .addFlag("l2", "Should use version of the Safe contract that is more event heave")
-    .addParam("signers", "Comma separated list of signer addresses (dafault is the address of linked account)", undefined, types.string, true)
+    .addParam("signers", "Comma separated list of signer addresses (dafault is the address of linked account)", "", types.string, true)
     .addParam("threshold", "Threshold that should be used", 1, types.int, true)
     .addParam("fallback", "Fallback handler address", AddressZero, types.string, true)
     .addParam("nonce", "Nonce used with factory", new Date().getTime(), types.int, true)
-    .addParam("singleton", "Set to overwrite which singleton address to use", undefined, types.string, true)
-    .addParam("factory", "Set to overwrite which factory address to use", undefined, types.string, true)
+    .addParam("singleton", "Set to overwrite which singleton address to use", "", types.string, true)
+    .addParam("factory", "Set to overwrite which factory address to use", "", types.string, true)
     .setAction(async (taskArgs, hre) => {
         const singleton = taskArgs.l2 ? await safeL2Singleton(hre, taskArgs.singleton) : await safeSingleton(hre, taskArgs.singleton)
         const factory = await proxyFactory(hre, taskArgs.factory)
