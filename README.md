@@ -3,8 +3,12 @@ Gnosis Safe Tasks
 
 Install
 -------
-### Install requirements with yarn:
+Set correct node version (see `.nvmrc`) with [nvm](https://github.com/nvm-sh/nvm)
+```bash
+nvm use
+```
 
+Install requirements with yarn:
 ```bash
 yarn
 ```
@@ -49,7 +53,7 @@ yarn safe info <address>
 ### Propose Safe Transaction
 Creates a proposal json file for a Safe transaction that can be shared. The name of the json file will be `<safe_tx_hash>.proposal.json` and it will be stored in the `cli_cache` folder.
 
-#### Example
+#### Examples
 This will create a transaction from the Safe to the target without any value or data.
 ```bash
 yarn safe propose <address> --to <target>
