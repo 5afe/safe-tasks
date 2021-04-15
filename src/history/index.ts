@@ -2,7 +2,8 @@ import { task, types } from "hardhat/config";
 import { safeSingleton } from "../contracts";
 import { loadHistoryTxs } from "./loading";
 
-task("history", "WIP: Displays the transaction history of a Safe based on events (ordered newest first)")
+task("history", `WIP: Displays the transaction history of a Safe based on events (ordered newest first). 
+Only outgoing transactions made with a Safe >=1.1.0 will be displayed.`)
     .addPositionalParam("address", "Address or ENS name of the Safe to check", undefined, types.string)
     .addParam("start", "Start index of the tx to load", 0, types.int, true)
     .setAction(async (taskArgs, hre) => {
