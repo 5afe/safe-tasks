@@ -55,9 +55,6 @@ const userConfig: HardhatUserConfig = {
   },
   networks: {
     hardhat: {
-      allowUnlimitedContractSize: true,
-      blockGasLimit: 100000000,
-      gas: 100000000
     },
     mainnet: {
       ...sharedNetworkConfig,
@@ -95,8 +92,14 @@ const userConfig: HardhatUserConfig = {
     timeout: 2000000,
   },
 };
-if (NETWORK) {
+if (NETWORK && NETWORK !== "fork") {
   userConfig.defaultNetwork = NETWORK
+}
+if (NETWORK && NODE_URL && NETWORK === "fork") {
+  userConfig.networks!!.hardhat!!.forking = {
+    enabled: true,
+    url: NODE_URL
+  }
 }
 if (NODE_URL) {
   userConfig.networks!!.custom = {
