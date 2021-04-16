@@ -56,6 +56,7 @@ task("propose", "Create a Safe tx proposal json file")
 interface TxDescription {
     to: string,
     value: string // in ETH
+    data?: string
     method?: string
     params?: any[]
     operation: 0 | 1
@@ -70,7 +71,7 @@ const buildMetaTx = (description: TxDescription): MetaTransaction => {
     const to = getAddress(description.to)
     const value = parseEther(description.value).toString()
     const operation = description.operation
-    const data = description.method ? buildData(description.method, description.params) : "0x"
+    const data = isHexString(description.data) ? description.data!! : (description.method ? buildData(description.method, description.params) : "0x")
     return { to, value, data, operation }
 }
 
