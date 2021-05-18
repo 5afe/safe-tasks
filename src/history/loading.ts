@@ -1,7 +1,6 @@
 import { calculateSafeTransactionHash, EIP712_SAFE_TX_TYPE } from '@gnosis.pm/safe-contracts'
-import { getSafeL2SingletonDeployment, getSafeSingletonDeployment } from '@gnosis.pm/safe-deployments'
-import { ethers } from 'ethers'
-import { safeL2Singleton } from '../contracts'
+import { getSafeL2SingletonDeployment } from '@gnosis.pm/safe-deployments'
+import { BigNumber, ethers } from 'ethers'
 import { EtherDetails, EventTx, ModuleTx, MultisigTx, MultisigUnknownTx, TransferDetails, TransferTx } from './types'
 
 const erc20InterfaceDefinition = [
@@ -23,11 +22,14 @@ const safeAbi = getSafeL2SingletonDeployment({ released: undefined })!!.abi
 const safeInterface = new ethers.utils.Interface(safeAbi)
 const successTopic = safeInterface.getEventTopic("ExecutionSuccess")
 const failureTopic = safeInterface.getEventTopic("ExecutionFailure")
+const multisigDetailsTopic = safeInterface.getEventTopic("SafeMultiSigTransaction")
 const moduleSuccessTopic = safeInterface.getEventTopic("ExecutionFromModuleSuccess")
 const moduleFailureTopic = safeInterface.getEventTopic("ExecutionFromModuleFailure")
+const moduleDetailsTopic = safeInterface.getEventTopic("SafeModuleTransaction")
 const etherReceivedTopic = safeInterface.getEventTopic("SafeReceived")
 // Failure topics cannot generate sub events, we should remove them in the future
 const parentTopics = [successTopic, moduleSuccessTopic, failureTopic, moduleFailureTopic]
+const detailsTopics = [multisigDetailsTopic, moduleDetailsTopic]
 
 const loadBlock = async (provider: ethers.providers.Provider, blockHash: string): Promise<ethers.providers.Block> => {
     return await provider.getBlock(blockHash)
@@ -48,6 +50,7 @@ export interface DecodedMultisigTx {
     gasToken: string
     refundReceiver: string
     signatures: string
+    nonce?: number
 }
 
 const decodeTx = (account: string, tx: ethers.providers.TransactionResponse): DecodedMultisigTx | undefined => {
@@ -73,9 +76,32 @@ const decodeTx = (account: string, tx: ethers.providers.TransactionResponse): De
     }
 }
 
-const mutlisigTxEntry = async (provider: ethers.providers.Provider, account: string, nonceMapper: NonceMapper, log: ethers.providers.Log, safeTxHash: string, success: boolean, subLogs: ethers.providers.Log[]): Promise<MultisigTx | MultisigUnknownTx> => {
-    const ethTx = await loadEthTx(provider, log.transactionHash)
-    const decodedTx = decodeTx(account, ethTx)
+const decodeMultisigDetails = (log: ethers.providers.Log | undefined): DecodedMultisigTx | undefined => {
+    if (!log) return undefined
+    const event = safeInterface.decodeEventLog("SafeMultiSigTransaction", log.data, log.topics)
+    return {
+        to: event.to,
+        value: event.value.toString(),
+        data: event.data,
+        operation: event.operation,
+        safeTxGas: event.safeTxGas.toString(),
+        baseGas: event.baseGas.toString(),
+        gasPrice: event.gasPrice.toString(),
+        gasToken: event.gasToken,
+        refundReceiver: event.refundReceiver,
+        signatures: event.signatures,
+        nonce: BigNumber.from(event.additionalInfo.slice(0, 66)).toNumber()
+    }
+}
+
+const mutlisigTxEntry = async (provider: ethers.providers.Provider, account: string, nonceMapper: NonceMapper, log: ethers.providers.Log, safeTxHash: string, success: boolean, subLogs: ethers.providers.Log[], details: ethers.providers.Log | undefined): Promise<MultisigTx | MultisigUnknownTx> => {
+    let decodedTx: DecodedMultisigTx | undefined
+    decodedTx = decodeMultisigDetails(details)
+    if (!decodedTx) {
+        console.log("Fallback to transaction decoding")
+        const ethTx = await loadEthTx(provider, log.transactionHash)
+        decodedTx = decodeTx(account, ethTx)
+    }
     const block = await loadBlock(provider, log.blockHash)
     if (!decodedTx) return {
         type: "MultisigUnknown",
@@ -95,11 +121,18 @@ const mutlisigTxEntry = async (provider: ethers.providers.Provider, account: str
         safeTxHash,
         success,
         ...decodedTx,
-        nonce: await nonceMapper.map(safeTxHash, decodedTx)
+        nonce: decodedTx.nonce || await nonceMapper.map(safeTxHash, decodedTx)
     }
 }
 
-const moduleTxEntry = async (provider: ethers.providers.Provider, log: ethers.providers.Log, moduleAddress: string, success: boolean, subLogs: ethers.providers.Log[]): Promise<ModuleTx> => {
+const decodeModuleDetails = (log: ethers.providers.Log | undefined): any => {
+    if (!log) return undefined
+    const event = safeInterface.decodeEventLog("SafeModuleTransaction", log.data, log.topics)
+    return event
+}
+
+const moduleTxEntry = async (provider: ethers.providers.Provider, log: ethers.providers.Log, moduleAddress: string, success: boolean, subLogs: ethers.providers.Log[], details: ethers.providers.Log | undefined): Promise<ModuleTx> => {
+    console.log("Module details:", decodeModuleDetails(details))
     const block = await loadBlock(provider, log.blockHash)
     return {
         type: "Module",
@@ -172,34 +205,35 @@ const incomingEthEntry = async (provider: ethers.providers.Provider, account: st
     }
 }
 
-const mapLog = async (provider: ethers.providers.Provider, account: string, nonceMapper: NonceMapper, log: ethers.providers.Log, subLogs: ethers.providers.Log[]): Promise<EventTx | undefined> => {
-    switch (log.topics[0]) {
+const mapLog = async (provider: ethers.providers.Provider, account: string, nonceMapper: NonceMapper, group: GroupedLogs): Promise<EventTx | undefined> => {
+    const { parent, children, details } = group
+    switch (parent.topics[0]) {
         case successTopic: {
-            const event = safeInterface.decodeEventLog("ExecutionSuccess", log.data, log.topics)
-            return await mutlisigTxEntry(provider, account, nonceMapper, log, event.txHash, true, subLogs)
+            const event = safeInterface.decodeEventLog("ExecutionSuccess", parent.data, parent.topics)
+            return await mutlisigTxEntry(provider, account, nonceMapper, parent, event.txHash, true, children, details)
         }
         case failureTopic: {
-            const event = safeInterface.decodeEventLog("ExecutionFailure", log.data, log.topics)
-            return await mutlisigTxEntry(provider, account, nonceMapper, log, event.txHash, false, subLogs)
+            const event = safeInterface.decodeEventLog("ExecutionFailure", parent.data, parent.topics)
+            return await mutlisigTxEntry(provider, account, nonceMapper, parent, event.txHash, false, children, details)
         }
         case moduleSuccessTopic: {
-            const event = safeInterface.decodeEventLog("ExecutionFromModuleSuccess", log.data, log.topics)
-            return await moduleTxEntry(provider, log, event.module, true, subLogs)
+            const event = safeInterface.decodeEventLog("ExecutionFromModuleSuccess", parent.data, parent.topics)
+            return await moduleTxEntry(provider, parent, event.module, true, children, details)
         }
         case moduleFailureTopic: {
-            const event = safeInterface.decodeEventLog("ExecutionFromModuleFailure", log.data, log.topics)
-            return await moduleTxEntry(provider, log, event.module, false, subLogs)
+            const event = safeInterface.decodeEventLog("ExecutionFromModuleFailure", parent.data, parent.topics)
+            return await moduleTxEntry(provider, parent, event.module, false, children, details)
         }
         case transferTopic: {
-            if (subLogs.length > 0) console.error("Sub logs for transfer entry!", log, subLogs)
-            return await transferEntry(provider, account, log)
+            if (children.length > 0) console.error("Sub logs for transfer entry!", parent, children)
+            return await transferEntry(provider, account, parent)
         }
         case etherReceivedTopic: {
-            if (subLogs.length > 0) console.error("Sub logs for transfer entry!", log, subLogs)
-            return await incomingEthEntry(provider, account, log)
+            if (children.length > 0) console.error("Sub logs for transfer entry!", parent, children)
+            return await incomingEthEntry(provider, account, parent)
         }
         default:
-            console.error("Received unknown event", log)
+            console.error("Received unknown event", parent)
             return undefined
     }
 }
@@ -240,7 +274,7 @@ const loadIncomingEther = (provider: ethers.providers.Provider, account: string)
 
 const loadSafeModuleTransactions = (provider: ethers.providers.Provider, account: string): Promise<ethers.providers.Log[]> => {
     const filter = {
-        topics: [[moduleSuccessTopic, moduleFailureTopic]],
+        topics: [[moduleSuccessTopic, moduleFailureTopic, moduleDetailsTopic]],
         address: account,
         fromBlock: "earliest"
     }
@@ -252,7 +286,7 @@ const loadSafeModuleTransactions = (provider: ethers.providers.Provider, account
 
 const loadSafeMultisigTransactions = (provider: ethers.providers.Provider, account: string): Promise<ethers.providers.Log[]> => {
     const filter = {
-        topics: [[successTopic, failureTopic]],
+        topics: [[successTopic, failureTopic, multisigDetailsTopic]],
         address: account,
         fromBlock: "earliest"
     }
@@ -304,16 +338,17 @@ const mergeLogs = async (...loaders: Promise<ethers.providers.Log[]>[]): Promise
 
 interface GroupedLogs {
     parent: ethers.providers.Log,
-    details?: ethers.providers.Log, // This is for the future (L2 Safe) and we expect the event order details -> children -> parent
+    details?: ethers.providers.Log, // This is for L2 Safes, we expect the event order details -> children -> parent
     children: ethers.providers.Log[]
 }
 
 const groupIdFromLog = (log: ethers.providers.Log): string => `${log.blockNumber}_${log.transactionIndex}`
 
-const updateGroupedLogs = (groups: GroupedLogs[], parentCandidate: ethers.providers.Log | undefined, currentChildren: ethers.providers.Log[]) => {
+const updateGroupedLogs = (groups: GroupedLogs[], detailsCandidate: ethers.providers.Log | undefined, parentCandidate: ethers.providers.Log | undefined, currentChildren: ethers.providers.Log[]) => {
     if (parentCandidate) {
         groups.push({
             parent: parentCandidate,
+            details: detailsCandidate,
             children: currentChildren
         })
     } else if (currentChildren.length > 0) {
@@ -324,25 +359,30 @@ const updateGroupedLogs = (groups: GroupedLogs[], parentCandidate: ethers.provid
 const groupLogs = (logs: ethers.providers.Log[]): GroupedLogs[] => {
     const out: GroupedLogs[] = []
     let currentChildren: ethers.providers.Log[] = []
+    let detailsCandidates: ethers.providers.Log[] = []
     let parentCandidate: ethers.providers.Log | undefined
     let currentGroupId: string | undefined = undefined
     for (const log of logs) {
         const groupId = groupIdFromLog(log)
         const isParentCandidate = parentTopics.indexOf(log.topics[0]) >= 0
+        const isDetailsCandidate = detailsTopics.indexOf(log.topics[0]) >= 0
         if (currentGroupId !== groupId || (isParentCandidate && parentCandidate)) {
-            updateGroupedLogs(out, parentCandidate, currentChildren)
+            updateGroupedLogs(out, detailsCandidates.pop(), parentCandidate, currentChildren)
             parentCandidate = undefined
+            detailsCandidates = []
             currentChildren = []
             currentGroupId = undefined
         }
         if (!currentGroupId) currentGroupId = groupId
         if (isParentCandidate) {
             parentCandidate = log
+        } else if (isDetailsCandidate) {
+            detailsCandidates.push(log)
         } else {
             currentChildren.push(log)
         }
     }
-    updateGroupedLogs(out, parentCandidate, currentChildren)
+    updateGroupedLogs(out, detailsCandidates.pop(), parentCandidate, currentChildren)
     return out
 }
 
@@ -388,6 +428,6 @@ export const loadHistoryTxs = async (provider: ethers.providers.Provider, accoun
     const nonceMapper = new NonceMapper(provider, account)
     await nonceMapper.init()
     const groups = groupLogs(txLogs.reverse())
-    const inter = groups.slice(start, start + 5).map(({ parent, children }) => mapLog(provider, account, nonceMapper, parent, children))
+    const inter = groups.slice(start, start + 5).map((group) => mapLog(provider, account, nonceMapper, group))
     return (await Promise.all(inter)).filter((e) => e !== undefined) as EventTx[]
 }
