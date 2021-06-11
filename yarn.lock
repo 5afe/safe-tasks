@@ -377,14 +377,14 @@
     "@ethersproject/strings" "^5.1.0"
 
 "@gnosis.pm/safe-contracts@1.3.0":
-  version "1.3.0-rc.0"
-  resolved "https://registry.yarnpkg.com/@gnosis.pm/safe-contracts/-/safe-contracts-1.3.0-rc.0.tgz#d47f19d3db3615745974d772e54729c03bf38591"
-  integrity sha512-EpzYvQf30qpijTVMob6rorUr96YCAMTZvdX1UnKnCAtvRJrQsHUSX2QSxrBqeeQ4qEdcYqKwqU0fhX9WC4ooRQ==
+  version "1.3.0"
+  resolved "https://registry.yarnpkg.com/@gnosis.pm/safe-contracts/-/safe-contracts-1.3.0.tgz#316741a7690d8751a1f701538cfc9ec80866eedc"
+  integrity sha512-1p+1HwGvxGUVzVkFjNzglwHrLNA67U/axP0Ct85FzzH8yhGJb4t9jDjPYocVMzLorDoWAfKicGy1akPY9jXRVw==
 
 "@gnosis.pm/safe-deployments@1.0.0":
-  version "1.0.0-rc.1"
-  resolved "https://registry.yarnpkg.com/@gnosis.pm/safe-deployments/-/safe-deployments-1.0.0-rc.1.tgz#d8bcb14e99065197f716ce7146e81ca6c65cd5a2"
-  integrity sha512-vR2sqcYxkG11lDhC7ELpKU73/xLfz3FVWrW2y27Euc9IkOHg+THS8YjAK7slg9nxE0I+6V9gZ6pl2d6kOeMwrw==
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/@gnosis.pm/safe-deployments/-/safe-deployments-1.0.0.tgz#ba7ab027d8f0563e6f1e472c4073cbcc15db3e90"
+  integrity sha512-ShZMGy4LaP27HqDKDguCGC+6CfS86ceq8gBrnbJvIUNzijSAjeLyJTvjKxTkOl3hAxmyk/DjtO3/DQGE4LVE6g==
 
 "@nodelib/fs.scandir@2.1.4":
   version "2.1.4"
