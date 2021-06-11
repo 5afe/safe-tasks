@@ -53,22 +53,27 @@ const isOwnerSignature = (owners: string[], signature: SafeSignature): SafeSigna
 }
 
 const prepareSignatures = async (safe: Contract, tx: SafeTransaction, signaturesCSV: string | undefined, submitter?: Signer, knownSafeTxHash?: string): Promise<SafeSignature[]> => {
-    const signatures: SafeSignature[] = []
     const owners = await safe.getOwners()
-    if (submitter && owners.indexOf(await submitter.getAddress()) >= 0) {
-        signatures.push(await safeApproveHash(submitter, safe, tx, true))
-    }
+    const signatures = new Map<String, SafeSignature>()
+    const submitterAddress = submitter && await submitter.getAddress()
     if (signaturesCSV) {
         const chainId = (await safe.provider.getNetwork()).chainId
         const safeTxHash = knownSafeTxHash ?? calculateSafeTransactionHash(safe, tx, chainId)
-        const parsedSigs = signaturesCSV.split(",")
-            .map(signature => isOwnerSignature(owners, parseSignature(safeTxHash, signature)))
-            .filter(signature => signature.signer !== signatures[0]?.signer)
-        signatures.push(...parsedSigs)
+        for (const signatureString of signaturesCSV.split(",")) {
+            const signature = isOwnerSignature(owners, parseSignature(safeTxHash, signatureString))
+            if (submitterAddress === signature.signer || signatures.has(signature.signer)) continue
+            signatures.set(signature.signer, signature)
+        }
     }
     const threshold = (await safe.getThreshold()).toNumber()
-    if (threshold > signatures.length) throw Error(`Not enough signatures (${signatures.length} of ${threshold})`)
-    return signatures.slice(0, threshold)
+    const submitterIsOwner = submitterAddress && owners.indexOf(submitterAddress) >= 0
+    const requiredSigntures = submitterIsOwner ? threshold - 1 : threshold
+    if (requiredSigntures > signatures.size) throw Error(`Not enough signatures (${signatures.size} of ${threshold})`)
+    const signatureArray = []
+    if (submitterIsOwner) {
+        signatureArray.push(await safeApproveHash(submitter!!, safe, tx, true))
+    }
+    return signatureArray.concat(Array.from(signatures.values()).slice(0, requiredSigntures))
 }
 
 task("submit-tx", "Executes a Safe transaction")
@@ -77,8 +82,9 @@ task("submit-tx", "Executes a Safe transaction")
     .addParam("value", "Value in ETH", "0", types.string, true)
     .addParam("data", "Data as hex string", "0x", types.string, true)
     .addParam("signatures", "Comma seperated list of signatures", undefined, types.string, true)
+    .addParam("gasPrice", "Gas price to be used", undefined, types.int, true)
+    .addParam("gasLimit", "Gas limit to be used", undefined, types.int, true)
     .addFlag("delegatecall", "Indicator if tx should be executed as a delegatecall")
-    .addFlag("useAccessList", "Indicator if tx should use EIP-2929")
     .setAction(async (taskArgs, hre) => {
         console.log(`Running on ${hre.network.name}`)
         const [signer] = await hre.ethers.getSigners()
@@ -87,15 +93,15 @@ task("submit-tx", "Executes a Safe transaction")
         console.log(`Using Safe at ${safeAddress} with ${signer.address}`)
         const nonce = await safe.nonce()
         if (!isHexString(taskArgs.data)) throw Error(`Invalid hex string provided for data: ${taskArgs.data}`)
-        const tx = buildSafeTransaction({ to: taskArgs.to, value: parseEther(taskArgs.value), data: taskArgs.data, nonce, operation: taskArgs.delegatecall ? 1 : 0 })
+        const tx = buildSafeTransaction({ 
+            to: taskArgs.to, 
+            value: parseEther(taskArgs.value), 
+            data: taskArgs.data, 
+            nonce, 
+            operation: taskArgs.delegatecall ? 1 : 0 
+        })
         const signatures = await prepareSignatures(safe, tx, taskArgs.signatures, signer)
-        const populatedTx: PopulatedTransaction = await populateExecuteTx(safe, tx, signatures)
-        if (taskArgs.useAccessList) {
-            populatedTx.type = 1
-            populatedTx.accessList = [
-                { address: await getSingletonAddress(hre, safe.address), storageKeys: [] }, // Singleton address
-            ]
-        }
+        const populatedTx: PopulatedTransaction = await populateExecuteTx(safe, tx, signatures, { gasLimit: taskArgs.gasLimit, gasPrice: taskArgs.gasPrice })
         const receipt = await signer.sendTransaction(populatedTx).then(tx => tx.wait())
         console.log(receipt.transactionHash)
     });
@@ -104,7 +110,9 @@ task("submit-tx", "Executes a Safe transaction")
 task("submit-proposal", "Executes a Safe transaction")
     .addPositionalParam("hash", "Hash of Safe transaction to display", undefined, types.string)
     .addParam("signerIndex", "Index of the signer to use", 0, types.int, true)
-    .addFlag("useAccessList", "Indicator if tx should use EIP-2929")
+    .addParam("signatures", "Comma seperated list of signatures", undefined, types.string, true)
+    .addParam("gasPrice", "Gas price to be used", undefined, types.int, true)
+    .addParam("gasLimit", "Gas limit to be used", undefined, types.int, true)
     .setAction(async (taskArgs, hre) => {
         console.log(`Running on ${hre.network.name}`)
         const proposal: SafeTxProposal = await readFromCliCache(proposalFile(taskArgs.hash))
@@ -118,14 +126,12 @@ task("submit-proposal", "Executes a Safe transaction")
             throw Error("Proposal does not have correct nonce!")
         }
         const signatureStrings: Record<string, string> = await loadSignatures(taskArgs.hash)
-        const signatures = await prepareSignatures(safe, proposal.tx, Object.values(signatureStrings).join(","), signer, taskArgs.hash)
-        const populatedTx: PopulatedTransaction = await populateExecuteTx(safe, proposal.tx, signatures)
-        if (taskArgs.useAccessList) {
-            populatedTx.type = 1
-            populatedTx.accessList = [
-                { address: await getSingletonAddress(hre, safe.address), storageKeys: [] }, // Singleton address
-            ]
+        const signatureArray = Object.values(signatureStrings)
+        if (taskArgs.signatures) {
+            signatureArray.push(taskArgs.signatures)
         }
+        const signatures = await prepareSignatures(safe, proposal.tx, signatureArray.join(","), signer, taskArgs.hash)
+        const populatedTx: PopulatedTransaction = await populateExecuteTx(safe, proposal.tx, signatures, { gasLimit: taskArgs.gasLimit, gasPrice: taskArgs.gasPrice })
         const receipt = await signer.sendTransaction(populatedTx).then(tx => tx.wait())
         console.log(receipt.transactionHash)
     });
