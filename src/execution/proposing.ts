@@ -108,7 +108,8 @@ task("propose-multi", "Create a Safe tx proposal json file")
             tx
         }
         await writeToCliCache(proposalFile(safeTxHash), proposal)
-        console.log(`Safe transaction hash: ${safeTxHash}`)
+        console.log("Safe transaction hash:", safeTxHash)
+        return safeTxHash
     });
 
 task("show-proposal", "Shows details for a Safe transaction")

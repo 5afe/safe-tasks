@@ -1,7 +1,6 @@
 import { BigNumber, Contract, PopulatedTransaction, Signer, utils } from "ethers";
 import { task, types } from "hardhat/config";
 import { safeSingleton } from "../contracts";
-import { getSingletonAddress } from "../information";
 import { buildSafeTransaction, calculateSafeTransactionHash, populateExecuteTx, safeApproveHash, SafeSignature, SafeTransaction } from "@gnosis.pm/safe-contracts";
 import { parseEther } from "@ethersproject/units";
 import { getAddress } from "@ethersproject/address";
@@ -133,5 +132,6 @@ task("submit-proposal", "Executes a Safe transaction")
         const signatures = await prepareSignatures(safe, proposal.tx, signatureArray.join(","), signer, taskArgs.hash)
         const populatedTx: PopulatedTransaction = await populateExecuteTx(safe, proposal.tx, signatures, { gasLimit: taskArgs.gasLimit, gasPrice: taskArgs.gasPrice })
         const receipt = await signer.sendTransaction(populatedTx).then(tx => tx.wait())
-        console.log(receipt.transactionHash)
+        console.log("Ethereum transaction hash:", receipt.transactionHash)
+        return receipt.transactionHash
     });
