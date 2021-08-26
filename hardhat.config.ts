@@ -86,6 +86,10 @@ const userConfig: HardhatUserConfig = {
       ...sharedNetworkConfig,
       url: `https://volta-rpc.energyweb.org`,
     },
+    bsc: {
+      ...sharedNetworkConfig,
+      url: `https://bsc-dataseed.binance.org/`,
+    },
   },
   namedAccounts: {
     deployer: 0,
