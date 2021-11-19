@@ -1,7 +1,17 @@
 [
     {
         "to": "0xA6DdF1aa7043EE4e70537dAAaE8C249cc7E34Da4",
-        "value": "1000",
+        "value": "0.001",
         "operation": 0
+    },
+    {
+        "to": "0x4200000000000000000000000000000000000006",
+        "value": "0",
+        "operation": 0,
+        "method": "transfer(address,uint256)",
+        "params": [
+            "0xA6DdF1aa7043EE4e70537dAAaE8C249cc7E34Da4",
+            "10000000000000"
+        ]
     }
 ]

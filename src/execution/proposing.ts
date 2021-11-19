@@ -75,7 +75,7 @@ const buildMetaTx = (description: TxDescription): MetaTransaction => {
     return { to, value, data, operation }
 }
 
-const parseMultiSendJsonFile = async (hre: HardhatRuntimeEnvironment, file: string, nonce: number): Promise<SafeTransaction> => {
+const parseMultiSendJsonFile = async (hre: HardhatRuntimeEnvironment, file: string, nonce: number, multiSendAddress?: string): Promise<SafeTransaction> => {
     const txsData: TxDescription[] = JSON.parse(await fs.readFile(file, 'utf8'))
     if (txsData.length == 0) {
         throw Error("No transacitons provided")
@@ -83,7 +83,7 @@ const parseMultiSendJsonFile = async (hre: HardhatRuntimeEnvironment, file: stri
     if (txsData.length == 1) {
         return buildSafeTransaction({ ...buildMetaTx(txsData[0]), nonce: nonce })
     }
-    const multiSend = await multiSendLib(hre)
+    const multiSend = await multiSendLib(hre, multiSendAddress)
     return buildMultiSendSafeTx(multiSend, txsData.map(desc => buildMetaTx(desc)), nonce)
 }
 
@@ -91,13 +91,14 @@ task("propose-multi", "Create a Safe tx proposal json file")
     .addPositionalParam("address", "Address or ENS name of the Safe to check", undefined, types.string)
     .addPositionalParam("txs", "Json file with transactions", undefined, types.inputFile)
     .addFlag("onChainHash", "Get hash from chain (required for pre-1.3.0 version)")
+    .addParam("multiSend", "Set to overwrite which multiSend address to use", "", types.string, true)
     .setAction(async (taskArgs, hre) => {
         console.log(`Running on ${hre.network.name}`)
         const safe = await safeSingleton(hre, taskArgs.address)
         const safeAddress = await safe.resolvedAddress
         console.log(`Using Safe at ${safeAddress}`)
         const nonce = await safe.nonce()
-        const tx = await parseMultiSendJsonFile(hre, taskArgs.txs, nonce.toNumber())
+        const tx = await parseMultiSendJsonFile(hre, taskArgs.txs, nonce.toNumber(), taskArgs.multiSend)
         console.log("Safe transaction", tx)
         const chainId = (await safe.provider.getNetwork()).chainId
         const safeTxHash = await calcSafeTxHash(safe, tx, chainId, taskArgs.onChainHash)

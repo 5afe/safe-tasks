@@ -10,7 +10,7 @@
         "operation": 0,
         "method": "withdraw(uint256)",
         "params": [
-            "10000000000000"
+            "1000000000000"
         ]
     }
 ]
