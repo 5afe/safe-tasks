@@ -90,6 +90,7 @@ const parseMultiSendJsonFile = async (hre: HardhatRuntimeEnvironment, file: stri
 task("propose-multi", "Create a Safe tx proposal json file")
     .addPositionalParam("address", "Address or ENS name of the Safe to check", undefined, types.string)
     .addPositionalParam("txs", "Json file with transactions", undefined, types.inputFile)
+    .addParam("nonce", "Set nonce to use (will default to on-chain nonce)", "", types.string, true)
     .addFlag("onChainHash", "Get hash from chain (required for pre-1.3.0 version)")
     .addParam("multiSend", "Set to overwrite which multiSend address to use", "", types.string, true)
     .setAction(async (taskArgs, hre) => {
@@ -97,8 +98,8 @@ task("propose-multi", "Create a Safe tx proposal json file")
         const safe = await safeSingleton(hre, taskArgs.address)
         const safeAddress = await safe.resolvedAddress
         console.log(`Using Safe at ${safeAddress}`)
-        const nonce = await safe.nonce()
-        const tx = await parseMultiSendJsonFile(hre, taskArgs.txs, nonce.toNumber(), taskArgs.multiSend)
+        const nonce = taskArgs.nonce || await safe.nonce()
+        const tx = await parseMultiSendJsonFile(hre, taskArgs.txs, BigNumber.from(nonce).toNumber(), taskArgs.multiSend)
         console.log("Safe transaction", tx)
         const chainId = (await safe.provider.getNetwork()).chainId
         const safeTxHash = await calcSafeTxHash(safe, tx, chainId, taskArgs.onChainHash)

@@ -14,3 +14,4 @@ solc
 coverage/
 coverage.json
 yarn-error.log
+templates/

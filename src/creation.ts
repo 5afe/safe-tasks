@@ -10,6 +10,7 @@ const parseSigners = (rawSigners: string): string[] => {
 
 task("create", "Create a Safe")
     .addFlag("l2", "Should use version of the Safe contract that is more event heave")
+    .addFlag("buildOnly", "Indicate wether this transaction should only be logged and not submitted on-chain")
     .addParam("signers", "Comma separated list of signer addresses (dafault is the address of linked account)", "", types.string, true)
     .addParam("threshold", "Threshold that should be used", 1, types.int, true)
     .addParam("fallback", "Fallback handler address", AddressZero, types.string, true)
@@ -27,7 +28,13 @@ task("create", "Create a Safe")
         )
         const predictedAddress = await calculateProxyAddress(factory, singleton.address, setupData, taskArgs.nonce)
         console.log(`Deploy Safe to ${predictedAddress}`)
-        await factory.createProxyWithNonce(singleton.address, setupData, taskArgs.nonce).then((tx: any) => tx.wait())
+        console.log(`Singleton: ${singleton.address}`)
+        console.log(`Setup data: ${setupData}`)
+        console.log(`Nonce: ${taskArgs.nonce}`)
+        console.log(`To (factory): ${factory.address}`)
+        console.log(`Data: ${factory.interface.encodeFunctionData("createProxyWithNonce", [singleton.address, setupData, taskArgs.nonce])}`)
+        if (!taskArgs.buildOnly)
+            await factory.createProxyWithNonce(singleton.address, setupData, taskArgs.nonce).then((tx: any) => tx.wait())
         // TODO verify deployment
     });
 
