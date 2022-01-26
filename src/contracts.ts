@@ -11,17 +11,17 @@ export const contractInstance = async (hre: HRE, deployment: SingletonDeployment
     return await hre.ethers.getContractAt(deployment.abi, contractAddress)
 }
 
-export const safeSingleton = async (hre: HRE, address?: string) => 
+export const safeSingleton = async (hre: HRE, address?: string) =>
     contractInstance(hre, getSafeSingletonDeployment({ released: undefined }), address)
 
-export const safeL2Singleton = async (hre: HRE, address?: string) => 
+export const safeL2Singleton = async (hre: HRE, address?: string) =>
     contractInstance(hre, getSafeL2SingletonDeployment({ released: undefined }), address)
 
-export const proxyFactory = async (hre: HRE, address?: string) => 
+export const proxyFactory = async (hre: HRE, address?: string) =>
     contractInstance(hre, getProxyFactoryDeployment(), address)
 
-export const multiSendLib = async (hre: HRE, address?: string) => 
+export const multiSendLib = async (hre: HRE, address?: string) =>
     contractInstance(hre, getMultiSendDeployment(), address)
-    
-export const compatHandler = async (hre: HRE, address?: string) => 
+
+export const compatHandler = async (hre: HRE, address?: string) =>
     contractInstance(hre, getCompatibilityFallbackHandlerDeployment(), address)

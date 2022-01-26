@@ -8,7 +8,10 @@
         "to": "0xc778417E063141139Fce010982780140Aa0cD5Ab",
         "value": "0",
         "method": "approve(address,uint256)",
-        "params": ["0xd0Dab4E640D95E9E8A47545598c33e31bDb53C7c", "1000000000000"],
+        "params": [
+            "0xd0Dab4E640D95E9E8A47545598c33e31bDb53C7c",
+            "1000000000000"
+        ],
         "operation": 0
     }
 ]
