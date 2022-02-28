@@ -112,6 +112,7 @@ task("submit-proposal", "Executes a Safe transaction")
     .addParam("signatures", "Comma seperated list of signatures", undefined, types.string, true)
     .addParam("gasPrice", "Gas price to be used", undefined, types.int, true)
     .addParam("gasLimit", "Gas limit to be used", undefined, types.int, true)
+    .addFlag("buildOnly", "Flag to only output the final transaction")
     .setAction(async (taskArgs, hre) => {
         console.log(`Running on ${hre.network.name}`)
         const proposal: SafeTxProposal = await readFromCliCache(proposalFile(taskArgs.hash))
@@ -131,6 +132,12 @@ task("submit-proposal", "Executes a Safe transaction")
         }
         const signatures = await prepareSignatures(safe, proposal.tx, signatureArray.join(","), signer, taskArgs.hash)
         const populatedTx: PopulatedTransaction = await populateExecuteTx(safe, proposal.tx, signatures, { gasLimit: taskArgs.gasLimit, gasPrice: taskArgs.gasPrice })
+        
+        if (taskArgs.buildOnly) {
+            console.log("Ethereum transaction:", populatedTx)
+            return
+        }
+        
         const receipt = await signer.sendTransaction(populatedTx).then(tx => tx.wait())
         console.log("Ethereum transaction hash:", receipt.transactionHash)
         return receipt.transactionHash

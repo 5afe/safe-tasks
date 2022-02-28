@@ -1,6 +1,6 @@
 import { task, types } from "hardhat/config";
 
-task("simple-submit-proposal", "Executes a Safe transaction from a file")
+task("submit-multi", "Executes a Safe transaction from a file")
     .addPositionalParam("address", "Address or ENS name of the Safe to check", undefined, types.string)
     .addPositionalParam("txs", "Json file with transactions", undefined, types.inputFile)
     .addFlag("onChainHash", "Get hash from chain (required for pre-1.3.0 version)")
@@ -9,6 +9,7 @@ task("simple-submit-proposal", "Executes a Safe transaction from a file")
     .addParam("signatures", "Comma seperated list of signatures", undefined, types.string, true)
     .addParam("gasPrice", "Gas price to be used", undefined, types.int, true)
     .addParam("gasLimit", "Gas limit to be used", undefined, types.int, true)
+    .addFlag("buildOnly", "Flag to only output the final transaction")
     .setAction(async (taskArgs, hre) => {
         const safeTxHash = await hre.run("propose-multi", {
             address: taskArgs.address,
@@ -22,5 +23,6 @@ task("simple-submit-proposal", "Executes a Safe transaction from a file")
             signerIndex: taskArgs.signerIndex,
             signatures: taskArgs.signatures,
             gasLimit: taskArgs.gasLimit,
+            buildOnly: taskArgs.buildOnly,
         })
     });
