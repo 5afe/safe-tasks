@@ -11,7 +11,7 @@ const parseSigners = (rawSigners: string): string[] => {
 
 task("create", "Create a Safe")
     .addFlag("l2", "Should use version of the Safe contract that is more event heave")
-    .addFlag("buildOnly", "Indicate wether this transaction should only be logged and not submitted on-chain")
+    .addFlag("buildOnly", "Indicate whether this transaction should only be logged and not submitted on-chain")
     .addParam("signers", "Comma separated list of signer addresses (dafault is the address of linked account)", "", types.string, true)
     .addParam("threshold", "Threshold that should be used", 1, types.int, true)
     .addParam("fallback", "Fallback handler address", AddressZero, types.string, true)
@@ -40,7 +40,7 @@ task("create", "Create a Safe")
     });
 
 task("create-bulk", "Create multiple Safes from CSV")
-    .addFlag("buildOnly", "Indicate wether this transaction should only be logged and not submitted on-chain")
+    .addFlag("buildOnly", "Indicate whether this transaction should only be logged and not submitted on-chain")
     .addPositionalParam("csv", "CSV file with the information of the Safes that should be created", undefined, types.inputFile)
     .addParam("fallback", "Fallback handler address", undefined, types.string, true)
     .addParam("nonce", "Nonce used with factory", "0", types.string, true)
