@@ -3,7 +3,7 @@ import { multiSendLib, safeSingleton } from "../contracts";
 import { buildMultiSendSafeTx, buildSafeTransaction, calculateSafeTransactionHash, SafeTransaction, MetaTransaction } from "@gnosis.pm/safe-contracts";
 import { parseEther } from "@ethersproject/units";
 import { getAddress, isHexString } from "ethers/lib/utils";
-import { proposalFile, readFromCliCache, writeToCliCache } from "./utils";
+import { proposalFile, readFromCliCache, writeToCliCache, writeTxBuilderJson } from "./utils";
 import { BigNumber } from "@ethersproject/bignumber";
 import { Contract, ethers } from "ethers";
 import fs from 'fs/promises'
@@ -75,33 +75,44 @@ const buildMetaTx = (description: TxDescription): MetaTransaction => {
     return { to, value, data, operation }
 }
 
-const parseMultiSendJsonFile = async (hre: HardhatRuntimeEnvironment, file: string, nonce: number, multiSendAddress?: string): Promise<SafeTransaction> => {
+const loadMetaTransactions = async (file: string) => {
     const txsData: TxDescription[] = JSON.parse(await fs.readFile(file, 'utf8'))
     if (txsData.length == 0) {
         throw Error("No transacitons provided")
     }
-    if (txsData.length == 1) {
-        return buildSafeTransaction({ ...buildMetaTx(txsData[0]), nonce: nonce })
+    return txsData.map(desc => buildMetaTx(desc))
+}
+
+const parseMultiSendJsonFile = async (hre: HardhatRuntimeEnvironment, txs: MetaTransaction[], nonce: number, multiSendAddress?: string): Promise<SafeTransaction> => {
+    if (txs.length == 1) {
+        return buildSafeTransaction({ ...txs[0], nonce: nonce })
     }
     const multiSend = await multiSendLib(hre, multiSendAddress)
-    return buildMultiSendSafeTx(multiSend, txsData.map(desc => buildMetaTx(desc)), nonce)
+    return buildMultiSendSafeTx(multiSend, txs, nonce)
 }
 
 task("propose-multi", "Create a Safe tx proposal json file")
     .addPositionalParam("address", "Address or ENS name of the Safe to check", undefined, types.string)
     .addPositionalParam("txs", "Json file with transactions", undefined, types.inputFile)
-    .addParam("nonce", "Set nonce to use (will default to on-chain nonce)", "", types.string, true)
-    .addFlag("onChainHash", "Get hash from chain (required for pre-1.3.0 version)")
     .addParam("multiSend", "Set to overwrite which multiSend address to use", "", types.string, true)
+    .addParam("nonce", "Set nonce to use (will default to on-chain nonce)", "", types.string, true)
+    .addParam("export", "If specified instead of executing the data will be exported as a json file for the transaction builder", undefined, types.string)
+    .addParam("name", "Name to be used for the transaction builder json", undefined, types.string, true)
+    .addFlag("onChainHash", "Get hash from chain (required for pre-1.3.0 version)")
     .setAction(async (taskArgs, hre) => {
         console.log(`Running on ${hre.network.name}`)
         const safe = await safeSingleton(hre, taskArgs.address)
         const safeAddress = await safe.resolvedAddress
         console.log(`Using Safe at ${safeAddress}`)
         const nonce = taskArgs.nonce || await safe.nonce()
-        const tx = await parseMultiSendJsonFile(hre, taskArgs.txs, BigNumber.from(nonce).toNumber(), taskArgs.multiSend)
-        console.log("Safe transaction", tx)
+        const txs = await loadMetaTransactions(taskArgs.txs)
         const chainId = (await safe.provider.getNetwork()).chainId
+        if (taskArgs.export) {
+            await writeTxBuilderJson(taskArgs.export, chainId.toString(), txs, taskArgs.name || "Custom Transactions")
+            return
+        } 
+        const tx = await parseMultiSendJsonFile(hre, txs, BigNumber.from(nonce).toNumber(), taskArgs.multiSend)
+        console.log("Safe transaction", tx)
         const safeTxHash = await calcSafeTxHash(safe, tx, chainId, taskArgs.onChainHash)
         const proposal: SafeTxProposal = {
             safe: safeAddress,

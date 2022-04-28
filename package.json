@@ -48,6 +48,7 @@
     "@types/mocha": "^8.2.0",
     "@types/yargs": "^15.0.10",
     "argv": "^0.0.2",
+    "csv-parser": "^3.0.0",
     "dotenv": "^8.0.0",
     "ethers": "^5.1.0",
     "hardhat": "^2.1.2",

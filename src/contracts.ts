@@ -1,5 +1,5 @@
 import { Contract } from "@ethersproject/contracts";
-import { getCompatibilityFallbackHandlerDeployment, getMultiSendDeployment, getProxyFactoryDeployment, getSafeSingletonDeployment, getSafeL2SingletonDeployment, SingletonDeployment } from "@gnosis.pm/safe-deployments";
+import { getCompatibilityFallbackHandlerDeployment, getMultiSendDeployment, getProxyFactoryDeployment, getSafeSingletonDeployment, getSafeL2SingletonDeployment, SingletonDeployment, getMultiSendCallOnlyDeployment } from "@gnosis.pm/safe-deployments";
 import { HardhatRuntimeEnvironment as HRE } from "hardhat/types";
 
 export const contractFactory = (hre: HRE, contractName: string) => hre.ethers.getContractFactory(contractName);
@@ -22,6 +22,9 @@ export const proxyFactory = async (hre: HRE, address?: string) =>
 
 export const multiSendLib = async (hre: HRE, address?: string) =>
     contractInstance(hre, getMultiSendDeployment(), address)
+
+export const multiSendCallOnlyLib = async (hre: HRE, address?: string) =>
+    contractInstance(hre, getMultiSendCallOnlyDeployment(), address)
 
 export const compatHandler = async (hre: HRE, address?: string) =>
     contractInstance(hre, getCompatibilityFallbackHandlerDeployment(), address)
