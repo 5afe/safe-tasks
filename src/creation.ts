@@ -47,26 +47,31 @@ task("create-bulk", "Create multiple Safes from CSV")
     .addParam("singleton", "Set to overwrite which singleton address to use", "", types.string, true)
     .addParam("factory", "Set to overwrite which factory address to use", "", types.string, true)
     .addFlag("l2", "Should use version of the Safe contract that is more event heave")
-    .addParam("export", "If specified instead of executing the data will be exported as a json file for the transaction builder", undefined, types.string)
+    .addParam("export", "If specified instead of executing the data will be exported as a json file for the transaction builder", undefined, types.string, true)
     .setAction(async (taskArgs, hre) => {
         const singleton = taskArgs.l2 ? await safeL2Singleton(hre, taskArgs.singleton) : await safeSingleton(hre, taskArgs.singleton)
         const factory = await proxyFactory(hre, taskArgs.factory)
         const fallbackHandler = await compatHandler(hre, taskArgs.fallback)
 
-        const inputs: { threshold: string, signers: string }[] = await readCsv(taskArgs.csv)
-        const encodedSetups: string[] = inputs.filter(entry => entry.signers.trim().length !== 0).map(entry => {
+        const inputs: { threshold: string, signers: string, address: string }[] = await readCsv(taskArgs.csv)
+        const encodedSetups: { data: string, signers: string[], threshold: string, expectedAddress?: string }[] = inputs.filter(entry => entry.signers.trim().length !== 0).map(entry => {
             const parsedThreshold = entry.threshold.split("/")[0]
             const expectedSignerCount = entry.threshold.split("/")[1]
-            const parsedSigners = entry.signers.replace(/\n/g,",").split(",")
-            console.log({parsedThreshold, expectedSignerCount, parsedSigners})
+            const parsedSigners = entry.signers.replace(/\n/g, ",").split(",")
+            console.log({ parsedThreshold, expectedSignerCount, parsedSigners })
             if (expectedSignerCount && parseInt(expectedSignerCount) !== parsedSigners.length) throw Error(`Expected ${expectedSignerCount} Signers, got ${parsedSigners}`)
-            return singleton.interface.encodeFunctionData(
-                "setup",
-                [parsedSigners, parsedThreshold, AddressZero, "0x", fallbackHandler.address, AddressZero, 0, AddressZero]
-            )
+            return {
+                data: singleton.interface.encodeFunctionData(
+                    "setup",
+                    [parsedSigners, parsedThreshold, AddressZero, "0x", fallbackHandler.address, AddressZero, 0, AddressZero]
+                ),
+                signers: parsedSigners,
+                threshold: parsedThreshold,
+                expectedAddress: entry.address
+            }
         })
         const deploymentTxs: MetaTransaction[] = encodedSetups.map(setup => {
-            const data = factory.interface.encodeFunctionData("createProxyWithNonce", [singleton.address, setup, taskArgs.nonce])
+            const data = factory.interface.encodeFunctionData("createProxyWithNonce", [singleton.address, setup.data, taskArgs.nonce])
             return { to: factory.address, data, operation: 0, value: "0" }
         })
         const multiSend = await multiSendCallOnlyLib(hre)
@@ -74,6 +79,15 @@ task("create-bulk", "Create multiple Safes from CSV")
         console.log(`Nonce: ${taskArgs.nonce}`)
         console.log(`Factory: ${factory.address}`)
         console.log(`Data: ${multiSend.interface.encodeFunctionData("multiSend", [encodeMultiSend(deploymentTxs)])}`)
+        console.log(`Predicted Safes:`)
+        for (const setupData of encodedSetups) {
+            console.log(`   Signers:`, setupData.signers.join(","), `Treshold:`, setupData.threshold, "of", setupData.signers.length)
+            const calculatedAddress = await calculateProxyAddress(factory, singleton.address, setupData.data, taskArgs.nonce)
+            console.log(`   Address:`, calculatedAddress)
+            if (setupData.expectedAddress && setupData.expectedAddress !== calculatedAddress)
+                console.warn(`      Unexpected Safe address! Expected ${setupData.expectedAddress}.`)
+            console.log()
+        }
 
         if (taskArgs.export) {
             const chainId = (await hre.ethers.provider.getNetwork()).chainId.toString()
