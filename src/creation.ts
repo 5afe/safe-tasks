@@ -85,7 +85,10 @@ task("create-bulk", "Create multiple Safes from CSV")
             const calculatedAddress = await calculateProxyAddress(factory, singleton.address, setupData.data, taskArgs.nonce)
             console.log(`   Address:`, calculatedAddress)
             if (setupData.expectedAddress && setupData.expectedAddress !== calculatedAddress)
-                console.warn(`      Unexpected Safe address! Expected ${setupData.expectedAddress}.`)
+                console.log(`      Unexpected Safe address! Expected ${setupData.expectedAddress}.`)
+            const onChainCode = await hre.ethers.provider.getCode(calculatedAddress)
+            if (onChainCode !== "0x")
+                console.log(`      Safe already exists on this address.`)
             console.log()
         }
 
