@@ -5,7 +5,7 @@ task("submit-multi", "Executes a Safe transaction from a file")
     .addPositionalParam("txs", "Json file with transactions", undefined, types.inputFile)
     .addFlag("onChainHash", "Get hash from chain (required for pre-1.3.0 version)")
     .addParam("multiSend", "Set to overwrite which multiSend address to use", "", types.string, true)
-    .addParam("signerIndex", "Index of the signer to use", 0, types.int, true)
+    .addParam("signer", "Index of the signer to use", 0, types.int, true)
     .addParam("signatures", "Comma seperated list of signatures", undefined, types.string, true)
     .addParam("gasPrice", "Gas price to be used", undefined, types.int, true)
     .addParam("gasLimit", "Gas limit to be used", undefined, types.int, true)
@@ -20,7 +20,7 @@ task("submit-multi", "Executes a Safe transaction from a file")
         await hre.run("submit-proposal", {
             hash: safeTxHash,
             onChainHash: taskArgs.onChainHash,
-            signerIndex: taskArgs.signerIndex,
+            signer: taskArgs.signer,
             signatures: taskArgs.signatures,
             gasLimit: taskArgs.gasLimit,
             buildOnly: taskArgs.buildOnly,

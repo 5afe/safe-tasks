@@ -108,7 +108,7 @@ task("submit-tx", "Executes a Safe transaction")
 
 task("submit-proposal", "Executes a Safe transaction")
     .addPositionalParam("hash", "Hash of Safe transaction to display", undefined, types.string)
-    .addParam("signerIndex", "Index of the signer to use", 0, types.int, true)
+    .addParam("signer", "Index of the signer to use", 0, types.int, true)
     .addParam("signatures", "Comma seperated list of signatures", undefined, types.string, true)
     .addParam("gasPrice", "Gas price to be used", undefined, types.int, true)
     .addParam("gasLimit", "Gas limit to be used", undefined, types.int, true)
@@ -117,7 +117,7 @@ task("submit-proposal", "Executes a Safe transaction")
         console.log(`Running on ${hre.network.name}`)
         const proposal: SafeTxProposal = await readFromCliCache(proposalFile(taskArgs.hash))
         const signers = await hre.ethers.getSigners()
-        const signer = signers[taskArgs.signerIndex]
+        const signer = signers[taskArgs.signer]
         const safe = await safeSingleton(hre, proposal.safe)
         const safeAddress = await safe.resolvedAddress
         console.log(`Using Safe at ${safeAddress} with ${signer.address}`)
