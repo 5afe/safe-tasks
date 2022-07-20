@@ -11,12 +11,12 @@ task("sign-tx", "Signs a Safe transaction")
     .addParam("to", "Address of the target", undefined, types.string)
     .addParam("value", "Value in ETH", "0", types.string, true)
     .addParam("data", "Data as hex string", "0x", types.string, true)
-    .addParam("signerIndex", "Index of the signer to use", 0, types.int, true)
+    .addParam("signer", "Index of the signer to use", 0, types.int, true)
     .addFlag("delegatecall", "Indicator if tx should be executed as a delegatecall")
     .setAction(async (taskArgs, hre) => {
         console.log(`Running on ${hre.network.name}`)
         const signers = await hre.ethers.getSigners()
-        const signer = signers[taskArgs.signerIndex]
+        const signer = signers[taskArgs.signer]
         const safe = await safeSingleton(hre, taskArgs.address)
         const safeAddress = await safe.resolvedAddress
         console.log(`Using Safe at ${safeAddress} with ${signer.address}`)
@@ -35,11 +35,11 @@ const updateSignatureFile = async(safeTxHash: string, signature: SafeSignature) 
 
 task("sign-proposal", "Signs a Safe transaction")
     .addPositionalParam("hash", "Hash of Safe transaction to display", undefined, types.string)
-    .addParam("signerIndex", "Index of the signer to use", 0, types.int, true)
+    .addParam("signer", "Index of the signer to use", 0, types.int, true)
     .setAction(async (taskArgs, hre) => {
         const proposal: SafeTxProposal = await readFromCliCache(proposalFile(taskArgs.hash))
         const signers = await hre.ethers.getSigners()
-        const signer = signers[taskArgs.signerIndex]
+        const signer = signers[taskArgs.signer]
         const safe = await safeSingleton(hre, proposal.safe)
         const safeAddress = await safe.resolvedAddress
         console.log(`Using Safe at ${safeAddress} with ${signer.address}`)
